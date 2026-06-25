@@ -67,6 +67,10 @@ async function startServer() {
   }
 
   // --- AUTH MIDDLEWARE & ROUTES ---
+  if (process.env.NODE_ENV === 'production' && !process.env.JWT_SECRET) {
+    console.error("FATAL: JWT_SECRET environment variable is required in production mode!");
+    process.exit(1);
+  }
   const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret_key_for_dev';
 
   const authenticateToken = (req: any, res: any, next: any) => {
@@ -128,18 +132,56 @@ async function startServer() {
   app.get('/api/dashboard/stats', async (req, res) => {
     try {
       const total = await Company.countDocuments();
-      const contacted = await Company.countDocuments({ status: { $ne: 'Not Contacted' } });
-      const hrConnected = await Company.countDocuments({ status: 'HR Connected' });
-      const interviews = await Company.countDocuments({ status: 'Interview' });
-      const offers = await Company.countDocuments({ status: 'Offer' });
-      const resumesSent = await Company.countDocuments({ status: 'Resume Sent' });
+      const notStarted = await Company.countDocuments({ status: { $in: ['Not Started', 'Not Contacted'] } });
+      const contacted = await Company.countDocuments({ status: 'Contacted' });
+      const pitched = await Company.countDocuments({ status: 'Pitched' });
+      const followUp = await Company.countDocuments({ status: 'Follow-up' });
+      const connected = await Company.countDocuments({ status: 'Connected' });
+      const lost = await Company.countDocuments({ status: 'Lost' });
 
       const now = new Date();
       const overdue = await Company.countDocuments({
         nextFollowUp: { $lt: now }
       });
 
-      res.json({ total, contacted, resumesSent, hrConnected, interviews, offers, overdue });
+      // Fetch activities created in the last 7 days for the chart
+      const sevenDaysAgo = new Date();
+      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+      const activitiesLast7Days = await Activity.aggregate([
+        { $match: { createdAt: { $gte: sevenDaysAgo } } },
+        {
+          $group: {
+            _id: { $dayOfWeek: "$createdAt" },
+            count: { $sum: 1 }
+          }
+        }
+      ]);
+
+      const chartData = [];
+      for (let i = 6; i >= 0; i--) {
+        const d = new Date();
+        d.setDate(d.getDate() - i);
+        const dayName = d.toLocaleDateString('en-US', { weekday: 'short' }); // e.g. "Mon"
+        const dayOfWeekIndex = d.getDay() + 1; // getDay() is 0-indexed (Sunday = 0), $dayOfWeek is 1-indexed (Sunday = 1)
+        const match = activitiesLast7Days.find(a => a._id === dayOfWeekIndex);
+        chartData.push({
+          name: dayName,
+          count: match ? match.count : 0
+        });
+      }
+
+      res.json({
+        total,
+        notStarted,
+        contacted,
+        pitched,
+        followUp,
+        connected,
+        lost,
+        overdue,
+        activityChart: chartData
+      });
     } catch (error) {
       console.error(error);
       res.status(500).json({ error: 'Failed to fetch stats' });
@@ -284,6 +326,26 @@ async function startServer() {
       }
 
       const result = await Company.insertMany(toInsert);
+
+      // Create activities for the imported companies (limit to first few to prevent DB spam, plus a summary)
+      if (result.length > 0) {
+        const activitiesToCreate = result.slice(0, 5).map(c => ({
+          type: 'Import',
+          description: `Imported and added ${c.name} to pipeline`,
+          companyId: c._id
+        }));
+
+        if (result.length > 5) {
+          activitiesToCreate.push({
+            type: 'Import',
+            description: `Imported a batch of ${result.length} companies`,
+            companyId: result[0]._id
+          });
+        }
+
+        await Activity.insertMany(activitiesToCreate);
+      }
+
       res.json({ inserted: result.length, data: result });
     } catch (error) {
       console.error(error);
@@ -297,7 +359,31 @@ async function startServer() {
       const data = req.body;
       // Remove id from data to prevent Mongoose errors
       const { id: _id, ...updateData } = data;
+
+      const oldCompany = await Company.findById(id);
       const result = await Company.findByIdAndUpdate(id, updateData, { new: true });
+
+      if (oldCompany && result) {
+        const activitiesToCreate = [];
+        if (updateData.status && oldCompany.status !== updateData.status) {
+          activitiesToCreate.push({
+            type: 'Status Change',
+            description: `Status updated from "${oldCompany.status}" to "${updateData.status}"`,
+            companyId: id
+          });
+        }
+        if (updateData.priority && oldCompany.priority !== updateData.priority) {
+          activitiesToCreate.push({
+            type: 'Priority Change',
+            description: `Priority updated from "${oldCompany.priority}" to "${updateData.priority}"`,
+            companyId: id
+          });
+        }
+        if (activitiesToCreate.length > 0) {
+          await Activity.insertMany(activitiesToCreate);
+        }
+      }
+
       res.json(result);
     } catch (error) {
       console.error(error);
@@ -325,6 +411,14 @@ async function startServer() {
         content,
         companyId: id
       });
+
+      // Create an activity log for note addition
+      await Activity.create({
+        type: 'Note Added',
+        description: `Added note: "${content.substring(0, 60)}${content.length > 60 ? '...' : ''}"`,
+        companyId: id
+      });
+
       res.json(note);
     } catch (error) {
       console.error(error);

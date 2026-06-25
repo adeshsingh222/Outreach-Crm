@@ -43,7 +43,7 @@ const CompanySchema: Schema = new Schema({
   email: { type: String },
   lat: { type: Number },
   lng: { type: Number },
-  placeId: { type: String },
+  placeId: { type: String, index: true },
   imageUrl: { type: String },
 
   hrName: { type: String },
@@ -54,7 +54,7 @@ const CompanySchema: Schema = new Schema({
   lastContactDate: { type: Date },
   nextFollowUp: { type: Date },
 
-  status: { type: String, default: 'Not Contacted' },
+  status: { type: String, default: 'Not Contacted', index: true },
   priority: { type: String, default: 'Medium' },
   
   tagIds: [{ type: Schema.Types.ObjectId, ref: 'Tag' }],

@@ -15,7 +15,8 @@ export default function ResumesPage() {
   }, [fetchAssets]);
 
   const handleCopy = (url: string, id: string) => {
-    navigator.clipboard.writeText(url);
+    const fullUrl = url.startsWith('http') ? url : window.location.origin + url;
+    navigator.clipboard.writeText(fullUrl);
     setCopiedId(id);
     setTimeout(() => setCopiedId(null), 2000);
   };
