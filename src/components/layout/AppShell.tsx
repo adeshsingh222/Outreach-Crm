@@ -29,7 +29,7 @@ const NAV_ITEMS = [
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const location = useLocation();
-  const { theme, setTheme } = useAppStore();
+  const { theme, setTheme, user, logout } = useAppStore();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const profileRef = useRef<HTMLDivElement>(null);
@@ -161,8 +161,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               {isProfileOpen && (
                 <div className="absolute right-0 mt-2 w-48 bg-surface border border-border rounded-lg shadow-card py-1 z-50">
                   <div className="px-4 py-2 border-b border-border">
-                    <p className="text-sm font-medium text-foreground">Alex</p>
-                    <p className="text-[11px] text-foreground-muted">alex@example.com</p>
+                    <p className="text-sm font-medium text-foreground">{user?.name || 'User'}</p>
+                    <p className="text-[11px] text-foreground-muted truncate">{user?.email || 'user@example.com'}</p>
                   </div>
                   <div className="py-1">
                     <button className="w-full px-4 py-2 text-left text-sm text-foreground-muted hover:text-foreground hover:bg-secondary flex items-center gap-2">
@@ -175,7 +175,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                     </button>
                   </div>
                   <div className="border-t border-border py-1">
-                    <button className="w-full px-4 py-2 text-left text-sm text-error-text hover:bg-error-bg/50 flex items-center gap-2 transition-colors">
+                    <button 
+                      onClick={logout}
+                      className="w-full px-4 py-2 text-left text-sm text-error-text hover:bg-error-bg/50 flex items-center gap-2 transition-colors"
+                    >
                       <LogOut className="w-4 h-4" />
                       Logout
                     </button>

@@ -7,6 +7,10 @@ import dotenv from 'dotenv';
 import { Company } from './src/models/Company.js';
 import { Note } from './src/models/Note.js';
 import { Activity } from './src/models/Activity.js';
+import { User } from './src/models/User.js';
+import cookieParser from 'cookie-parser';
+import jwt from 'jsonwebtoken';
+import bcrypt from 'bcryptjs';
 
 dotenv.config();
 
@@ -18,14 +22,83 @@ async function startServer() {
   const PORT = 3000;
 
   app.use(express.json());
+  app.use(cookieParser());
 
   // Connect to MongoDB
   try {
     await mongoose.connect(process.env.DATABASE_URL as string);
     console.log("Connected to MongoDB via Mongoose");
+    
+    // Seed dummy user
+    const userCount = await User.countDocuments();
+    if (userCount === 0) {
+      const passwordHash = await bcrypt.hash('password123', 10);
+      await User.create({
+        email: 'admin@crm.com',
+        name: 'Admin',
+        passwordHash
+      });
+      console.log('Dummy user created: admin@crm.com / password123');
+    }
   } catch (err) {
     console.error("MongoDB connection error:", err);
   }
+
+  // --- AUTH MIDDLEWARE & ROUTES ---
+  const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret_key_for_dev';
+
+  const authenticateToken = (req: any, res: any, next: any) => {
+    const token = req.cookies?.auth_token;
+    if (!token) return res.status(401).json({ error: 'Unauthorized' });
+
+    jwt.verify(token, JWT_SECRET, (err: any, user: any) => {
+      if (err) return res.status(403).json({ error: 'Forbidden' });
+      req.user = user;
+      next();
+    });
+  };
+
+  app.post('/api/auth/login', async (req, res) => {
+    try {
+      const { email, password } = req.body;
+      const user = await User.findOne({ email });
+      if (!user) return res.status(401).json({ error: 'Invalid credentials' });
+
+      const isValid = await bcrypt.compare(password, user.passwordHash);
+      if (!isValid) return res.status(401).json({ error: 'Invalid credentials' });
+
+      const token = jwt.sign({ id: user._id, email: user.email }, JWT_SECRET, { expiresIn: '7d' });
+      res.cookie('auth_token', token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
+      });
+      res.json({ message: 'Logged in successfully', user: { email: user.email, name: user.name } });
+    } catch (error) {
+      res.status(500).json({ error: 'Login failed' });
+    }
+  });
+
+  app.get('/api/auth/me', authenticateToken, async (req: any, res) => {
+    try {
+      const user = await User.findById(req.user.id).select('-passwordHash');
+      if (!user) return res.status(404).json({ error: 'User not found' });
+      res.json({ user });
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to fetch user' });
+    }
+  });
+
+  app.post('/api/auth/logout', (req, res) => {
+    res.clearCookie('auth_token');
+    res.json({ message: 'Logged out successfully' });
+  });
+
+  // PROTECT ALL SUBSEQUENT API ROUTES
+  app.use('/api', (req, res, next) => {
+    if (req.path.startsWith('/auth')) return next();
+    authenticateToken(req, res, next);
+  });
 
   // --- API ROUTES ---
 

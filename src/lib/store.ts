@@ -19,6 +19,13 @@ export type Company = {
 // Dummy data removed to ensure database connectivity is accurately reflected
 
 interface AppState {
+  user: any;
+  isAuthenticated: boolean;
+  isLoadingAuth: boolean;
+  login: (email: string, password: string) => Promise<boolean>;
+  logout: () => Promise<void>;
+  checkAuth: () => Promise<void>;
+  
   theme: 'light' | 'dark';
   setTheme: (theme: 'light' | 'dark') => void;
   isSidebarOpen: boolean;
@@ -35,6 +42,49 @@ interface AppState {
 }
 
 export const useAppStore = create<AppState>((set, get) => ({
+  user: null,
+  isAuthenticated: false,
+  isLoadingAuth: true,
+  login: async (email, password) => {
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        set({ user: data.user, isAuthenticated: true });
+        return true;
+      }
+      return false;
+    } catch {
+      return false;
+    }
+  },
+  logout: async () => {
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' });
+      set({ user: null, isAuthenticated: false });
+    } catch (err) {
+      console.error(err);
+    }
+  },
+  checkAuth: async () => {
+    try {
+      set({ isLoadingAuth: true });
+      const res = await fetch('/api/auth/me');
+      if (res.ok) {
+        const data = await res.json();
+        set({ user: data.user, isAuthenticated: true, isLoadingAuth: false });
+      } else {
+        set({ user: null, isAuthenticated: false, isLoadingAuth: false });
+      }
+    } catch {
+      set({ user: null, isAuthenticated: false, isLoadingAuth: false });
+    }
+  },
+
   theme: 'light',
   setTheme: (theme) => set({ theme }),
   isSidebarOpen: true,

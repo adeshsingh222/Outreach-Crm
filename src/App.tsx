@@ -5,14 +5,38 @@ import Dashboard from './features/dashboard/Dashboard';
 import Companies from './features/companies/Companies';
 import ImportLeadsPage from './pages/ImportLeadsPage';
 import CompanyDetailsPage from './pages/CompanyDetailsPage';
+import Login from './pages/Login';
 import { useAppStore } from './lib/store';
 
 export default function App() {
   const fetchCompanies = useAppStore(state => state.fetchCompanies);
+  const checkAuth = useAppStore(state => state.checkAuth);
+  const isAuthenticated = useAppStore(state => state.isAuthenticated);
+  const isLoadingAuth = useAppStore(state => state.isLoadingAuth);
 
   useEffect(() => {
-    fetchCompanies();
-  }, [fetchCompanies]);
+    checkAuth();
+  }, [checkAuth]);
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      fetchCompanies();
+    }
+  }, [isAuthenticated, fetchCompanies]);
+
+  if (isLoadingAuth) {
+    return <div className="min-h-screen flex items-center justify-center bg-background text-foreground">Loading...</div>;
+  }
+
+  if (!isAuthenticated) {
+    return (
+      <Router>
+        <Routes>
+          <Route path="*" element={<Login />} />
+        </Routes>
+      </Router>
+    );
+  }
 
   return (
     <Router>
