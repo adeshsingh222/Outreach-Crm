@@ -15,7 +15,9 @@ export type ImportedLead = {
   rating?: number;
   reviews?: number;
   placeId?: string;
+  imageUrl?: string;
   isDeleted: boolean;
+  isDuplicate: boolean; // true = already exists in DB
 };
 
 export default function ImportLeadsPage() {
@@ -31,8 +33,8 @@ export default function ImportLeadsPage() {
     Papa.parse(csvText, {
       header: true,
       skipEmptyLines: true,
-      complete: (results) => {
-        const parsedLeads: ImportedLead[] = results.data.map((row: any, index) => {
+      complete: async (results) => {
+        let parsedLeads: ImportedLead[] = results.data.map((row: any, index) => {
           return {
             id: `import-${Date.now()}-${index}`,
             name: row.name || row['Company Name'] || 'Unknown',
@@ -43,9 +45,63 @@ export default function ImportLeadsPage() {
             rating: Number(row.rating || row.Rating) || undefined,
             reviews: Number(row.reviews || row.Reviews) || undefined,
             placeId: row.placeId || row.place_id || row.google_id || '',
+            imageUrl: row.photo || row.photo1 || row.image || row.image_url || row.imageUrl || '',
             isDeleted: false,
+            isDuplicate: false,
           };
         }).filter(lead => lead.name !== 'Unknown');
+
+        const seenNames = new Set<string>();
+        const seenPlaceIds = new Set<string>();
+        
+        parsedLeads = parsedLeads.filter(lead => {
+          const isDuplicateName = seenNames.has(lead.name);
+          const isDuplicatePlaceId = lead.placeId ? seenPlaceIds.has(lead.placeId) : false;
+          
+          if (isDuplicateName || isDuplicatePlaceId) {
+            return false; // Skip intra-csv duplicates entirely
+          }
+          
+          seenNames.add(lead.name);
+          if (lead.placeId) seenPlaceIds.add(lead.placeId);
+          return true;
+        });
+
+        try {
+          const names = Array.from(seenNames);
+          const placeIds = Array.from(seenPlaceIds);
+          
+          const res = await fetch('/api/companies/check-duplicates', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',  // FIX: send auth cookie
+            body: JSON.stringify({ names, placeIds })
+          });
+          
+          if (res.ok) {
+            const result = await res.json();
+            const dbDuplicates = Array.isArray(result) ? result : (result.data || []);
+            
+            const toSlug = (s: string) => (s || '').toLowerCase().trim().replace(/\s+/g, '-');
+            const duplicateMetaNames = new Set(dbDuplicates.map((d: any) => toSlug(d.name)));
+            const duplicatePlaceIds = new Set(dbDuplicates.map((d: any) => (d.placeId || '').toLowerCase().trim()).filter(Boolean));
+            
+            parsedLeads = parsedLeads.map(lead => {
+              const leadMeta = toSlug(lead.name);
+              const leadPlaceId = (lead.placeId || '').toLowerCase().trim();
+              
+              if (duplicateMetaNames.has(leadMeta) || (leadPlaceId && duplicatePlaceIds.has(leadPlaceId))) {
+                return { ...lead, isDuplicate: true, isDeleted: true };
+              }
+              return lead;
+            });
+          } else {
+            console.error('Duplicate check API failed:', res.status, await res.text());
+          }
+        } catch (error) {
+          console.error('Failed to check duplicates', error);
+        }
+
         setLeads(parsedLeads);
         setIsParsing(false);
       },
@@ -74,6 +130,7 @@ export default function ImportLeadsPage() {
       rating: lead.rating,
       reviews: lead.reviews,
       placeId: lead.placeId,
+      imageUrl: lead.imageUrl,
       status: 'Not Started',
       priority: 'Low',
       lastContact: '-',
@@ -145,17 +202,21 @@ export default function ImportLeadsPage() {
           ) : (
             <div className="space-y-4 h-full flex flex-col">
               <div className="flex items-center justify-between shrink-0">
-                <h3 className="font-medium text-foreground text-[15px]">Review Leads ({leads.filter(l => !l.isDeleted).length} valid)</h3>
-                <p className="text-[13px] text-foreground-muted">Mark non-software companies as deleted before importing.</p>
+                <div>
+                  <h3 className="font-medium text-foreground text-[15px]">
+                    Review Leads ({leads.filter(l => !l.isDeleted).length} new, {leads.filter(l => l.isDuplicate).length} already in DB)
+                  </h3>
+                  <p className="text-[13px] text-foreground-muted mt-0.5">Companies marked "Already in DB" won't be imported again.</p>
+                </div>
               </div>
-              
+
               <div className="border border-border rounded-lg overflow-hidden shadow-sm flex-1 flex flex-col min-h-0">
                 <div className="overflow-x-auto overflow-y-auto flex-1">
                   <table className="w-full text-left text-sm whitespace-nowrap">
                     <thead className="bg-secondary text-foreground-muted text-[12px] uppercase font-semibold tracking-wider sticky top-0 z-10 shadow-sm">
                       <tr>
-                        <th className="px-4 py-3 border-b border-border bg-secondary">Status</th>
-                        <th className="px-4 py-3 border-b border-border bg-secondary">Company</th>
+                        <th className="px-4 py-3 border-b border-border bg-secondary w-[110px]">Status</th>
+                        <th className="px-4 py-3 border-b border-border bg-secondary w-[200px] max-w-[200px]">Company</th>
                         <th className="px-4 py-3 border-b border-border bg-secondary">Category</th>
                         <th className="px-4 py-3 border-b border-border bg-secondary">Website</th>
                         <th className="px-4 py-3 border-b border-border bg-secondary text-right">Action</th>
@@ -165,10 +226,16 @@ export default function ImportLeadsPage() {
                       {leads.map((lead) => (
                         <tr key={lead.id} className={cn(
                           "transition-colors",
-                          lead.isDeleted ? "bg-error-bg/30 text-foreground-muted" : "hover:bg-secondary/50 text-foreground"
+                          lead.isDuplicate ? "bg-amber-500/5 text-foreground-muted" :
+                          lead.isDeleted ? "bg-error-bg/30 text-foreground-muted" :
+                          "hover:bg-secondary/50 text-foreground"
                         )}>
                           <td className="px-4 py-3">
-                            {lead.isDeleted ? (
+                            {lead.isDuplicate ? (
+                              <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-sm bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400 text-[11px] font-medium whitespace-nowrap">
+                                Already in DB
+                              </span>
+                            ) : lead.isDeleted ? (
                               <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-sm bg-error-bg text-error-text text-[11px] font-medium">
                                 <X className="w-3 h-3" /> Skipped
                               </span>
@@ -178,13 +245,13 @@ export default function ImportLeadsPage() {
                               </span>
                             )}
                           </td>
-                          <td className={cn("px-4 py-3 font-medium", lead.isDeleted && "line-through opacity-50")}>
-                            {lead.name}
+                          <td className={cn("px-4 py-3 font-medium w-[200px] max-w-[200px]", (lead.isDeleted || lead.isDuplicate) && "line-through opacity-50")}>
+                            <span className="block truncate" title={lead.name}>{lead.name}</span>
                           </td>
-                          <td className={cn("px-4 py-3 text-[13px]", lead.isDeleted && "opacity-50")}>
+                          <td className={cn("px-4 py-3 text-[13px]", (lead.isDeleted || lead.isDuplicate) && "opacity-50")}>
                             {lead.category || '-'}
                           </td>
-                          <td className={cn("px-4 py-3 text-[13px]", lead.isDeleted && "opacity-50")}>
+                          <td className={cn("px-4 py-3 text-[13px]", (lead.isDeleted || lead.isDuplicate) && "opacity-50")}>
                             {lead.website ? (
                               <a href={lead.website} target="_blank" rel="noreferrer" className="text-primary hover:underline truncate max-w-[200px] inline-block">
                                 {lead.website}
@@ -192,7 +259,9 @@ export default function ImportLeadsPage() {
                             ) : '-'}
                           </td>
                           <td className="px-4 py-3 text-right">
-                            {lead.isDeleted ? (
+                            {lead.isDuplicate ? (
+                              <span className="text-[12px] text-foreground-muted px-2 py-1">—</span>
+                            ) : lead.isDeleted ? (
                               <button 
                                 onClick={() => toggleDelete(lead.id)}
                                 className="inline-flex items-center gap-1.5 text-[12px] font-medium text-primary hover:text-primary-hover px-2 py-1 rounded hover:bg-primary/10 transition-colors"
@@ -219,7 +288,7 @@ export default function ImportLeadsPage() {
         </div>
 
         {leads.length > 0 && (
-          <div className="p-5 border-t border-border bg-secondary/50 flex justify-between items-center mt-auto shrink-0">
+          <div className="p-5 border-t border-border bg-secondary/50 flex justify-between items-center shrink-0">
             <button 
               onClick={() => setLeads([])}
               className="px-4 py-2 text-[13px] font-medium text-foreground-muted hover:text-foreground transition-colors"

@@ -6,6 +6,7 @@ import Companies from './features/companies/Companies';
 import ImportLeadsPage from './pages/ImportLeadsPage';
 import CompanyDetailsPage from './pages/CompanyDetailsPage';
 import Login from './pages/Login';
+import ResumesPage from './pages/ResumesPage';
 import { useAppStore } from './lib/store';
 
 export default function App() {
@@ -46,8 +47,7 @@ export default function App() {
           <Route path="/companies" element={<Companies />} />
           <Route path="/companies/:id" element={<CompanyDetailsPage />} />
           <Route path="/import" element={<ImportLeadsPage />} />
-          {/* Fallback routes for demo */}
-          <Route path="/resumes" element={<div className="p-8">Resumes Page (Coming Soon)</div>} />
+          <Route path="/resumes" element={<ResumesPage />} />
           <Route path="/settings" element={<div className="p-8">Settings Page (Coming Soon)</div>} />
         </Routes>
       </AppShell>

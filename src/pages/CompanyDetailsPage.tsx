@@ -14,6 +14,29 @@ export default function CompanyDetailsPage() {
   const [notes, setNotes] = useState<Note[]>([]);
   const [isEnriching, setIsEnriching] = useState(false);
 
+  // Swipe to go back logic
+  const [touchStart, setTouchStart] = useState<number | null>(null);
+  const [touchEnd, setTouchEnd] = useState<number | null>(null);
+
+  const onTouchStart = (e: React.TouchEvent) => {
+    setTouchEnd(null);
+    setTouchStart(e.targetTouches[0].clientX);
+  };
+
+  const onTouchMove = (e: React.TouchEvent) => {
+    setTouchEnd(e.targetTouches[0].clientX);
+  };
+
+  const onTouchEnd = () => {
+    if (!touchStart || !touchEnd) return;
+    const distance = touchStart - touchEnd;
+    const isRightSwipe = distance < -50; // swipe right distance
+    
+    if (isRightSwipe) {
+      navigate('/companies');
+    }
+  };
+
   React.useEffect(() => {
     if (id) {
       fetch(`/api/companies/${id}/notes`)
@@ -85,7 +108,12 @@ export default function CompanyDetailsPage() {
   };
 
   return (
-    <div className="max-w-5xl mx-auto space-y-6">
+    <div 
+      className="max-w-5xl mx-auto space-y-6 overflow-x-hidden touch-pan-y"
+      onTouchStart={onTouchStart}
+      onTouchMove={onTouchMove}
+      onTouchEnd={onTouchEnd}
+    >
       {/* Header */}
       <div className="flex items-center gap-4">
         <button 
@@ -107,14 +135,20 @@ export default function CompanyDetailsPage() {
               )}>
                 {company.status || 'Not Started'}
               </span>
-              {company.priority && (
-                <span className={cn(
-                  "px-2 py-0.5 text-[11px] font-medium rounded-sm border",
-                  company.priority === 'High' ? 'text-error-text bg-error-bg border-transparent' : 'text-warning-text bg-warning-bg border-transparent'
-                )}>
-                  {company.priority} Priority
-                </span>
-              )}
+              <select 
+                value={company.priority || 'Low'}
+                onChange={(e) => updateCompany(company.id, { priority: e.target.value })}
+                className={cn(
+                  "px-2 py-0.5 text-[11px] font-medium rounded-sm border appearance-none cursor-pointer focus:outline-none focus:ring-1 focus:ring-primary/50 text-center text-center-last",
+                  company.priority === 'High' ? 'text-error-text bg-error-bg border-transparent' 
+                  : company.priority === 'Medium' ? 'text-warning-text bg-warning-bg border-transparent'
+                  : 'text-foreground-muted bg-secondary border-border'
+                )}
+              >
+                <option value="Low" className="text-foreground bg-surface">Low Priority</option>
+                <option value="Medium" className="text-foreground bg-surface">Medium Priority</option>
+                <option value="High" className="text-foreground bg-surface">High Priority</option>
+              </select>
             </div>
           </div>
         </div>

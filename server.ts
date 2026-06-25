@@ -8,9 +8,11 @@ import { Company } from './src/models/Company.js';
 import { Note } from './src/models/Note.js';
 import { Activity } from './src/models/Activity.js';
 import { User } from './src/models/User.js';
+import { Asset } from './src/models/Asset.js';
 import cookieParser from 'cookie-parser';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
+import multer from 'multer';
 
 dotenv.config();
 
@@ -23,12 +25,24 @@ async function startServer() {
 
   app.use(express.json());
   app.use(cookieParser());
+  app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
+  const storage = multer.diskStorage({
+    destination: function (req, file, cb) {
+      cb(null, 'uploads/');
+    },
+    filename: function (req, file, cb) {
+      const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+      cb(null, uniqueSuffix + path.extname(file.originalname));
+    }
+  });
+  const upload = multer({ storage: storage });
 
   // Connect to MongoDB
   try {
     await mongoose.connect(process.env.DATABASE_URL as string);
     console.log("Connected to MongoDB via Mongoose");
-    
+
     // Seed dummy user
     const userCount = await User.countDocuments();
     if (userCount === 0) {
@@ -38,7 +52,7 @@ async function startServer() {
         name: 'Admin',
         passwordHash
       });
-      console.log('Dummy user created: admin@crm.com / password123');
+      // console.log('Dummy user created: admin@crm.com / password123');
     }
   } catch (err) {
     console.error("MongoDB connection error:", err);
@@ -111,7 +125,7 @@ async function startServer() {
       const interviews = await Company.countDocuments({ status: 'Interview' });
       const offers = await Company.countDocuments({ status: 'Offer' });
       const resumesSent = await Company.countDocuments({ status: 'Resume Sent' });
-      
+
       const now = new Date();
       const overdue = await Company.countDocuments({
         nextFollowUp: { $lt: now }
@@ -131,7 +145,7 @@ async function startServer() {
         .sort({ createdAt: -1 })
         .limit(10)
         .populate('companyId', 'name');
-        
+
       res.json(activities.map(a => {
         const json = a.toJSON();
         return {
@@ -180,12 +194,70 @@ async function startServer() {
     }
   });
 
+  app.post('/api/companies/check-duplicates', async (req, res) => {
+    try {
+      const { names = [], placeIds = [] } = req.body;
+      const validPlaceIds = (placeIds as string[]).filter(Boolean);
+      
+      // Compute metaName slugs from the incoming names
+      const toSlug = (s: string) => s.toLowerCase().trim().replace(/\s+/g, '-');
+      const metaNames = (names as string[]).map(toSlug).filter(Boolean);
+
+      const conditions: any[] = [];
+      if (metaNames.length > 0) conditions.push({ metaName: { $in: metaNames } });
+      if (validPlaceIds.length > 0) conditions.push({ placeId: { $in: validPlaceIds } });
+      // Fallback: also match raw name for older records without metaName
+      if ((names as string[]).length > 0) conditions.push({ name: { $in: names } });
+
+      if (conditions.length === 0) return res.json([]);
+
+      const duplicates = await Company.find({ $or: conditions }, { name: 1, placeId: 1, metaName: 1 });
+      res.json(duplicates);
+    } catch (error) {
+      console.error('Failed to check duplicates:', error);
+      res.status(500).json({ error: 'Failed to check duplicates' });
+    }
+  });
+
   app.post('/api/companies', async (req, res) => {
     try {
       const data = req.body;
-      const result = await Company.insertMany(
-        data.map((c: any) => ({
+      const toSlug = (s: string) => (s || '').toLowerCase().trim().replace(/\s+/g, '-');
+
+      const incomingMetaNames = data.map((c: any) => toSlug(c.name)).filter(Boolean);
+      const incomingPlaceIds = data.map((c: any) => (c.placeId || '').toLowerCase().trim()).filter(Boolean);
+      
+      const conditions: any[] = [];
+      if (incomingMetaNames.length > 0) conditions.push({ metaName: { $in: incomingMetaNames } });
+      if (incomingPlaceIds.length > 0) conditions.push({ placeId: { $in: incomingPlaceIds } });
+      // Fallback for legacy records without metaName
+      if (data.length > 0) conditions.push({ name: { $in: data.map((c: any) => c.name) } });
+
+      const existingMetaNames = new Set<string>();
+      const existingPlaceIds = new Set<string>();
+      const existingNames = new Set<string>();
+
+      if (conditions.length > 0) {
+        const existing = await Company.find({ $or: conditions }, { name: 1, placeId: 1, metaName: 1 });
+        existing.forEach(c => {
+          if (c.metaName) existingMetaNames.add(c.metaName);
+          if (c.placeId) existingPlaceIds.add(c.placeId.toLowerCase().trim());
+          existingNames.add((c.name || '').toLowerCase().trim());
+        });
+      }
+
+      const toInsert = data
+        .filter((c: any) => {
+          const slug = toSlug(c.name);
+          const placeIdLower = (c.placeId || '').toLowerCase().trim();
+          const isDupByMeta = existingMetaNames.has(slug);
+          const isDupByPlaceId = placeIdLower && existingPlaceIds.has(placeIdLower);
+          const isDupByName = existingNames.has((c.name || '').toLowerCase().trim());
+          return !isDupByMeta && !isDupByPlaceId && !isDupByName;
+        })
+        .map((c: any) => ({
           name: c.name,
+          metaName: toSlug(c.name),
           website: c.website,
           phone: c.phone,
           address: c.address,
@@ -193,12 +265,18 @@ async function startServer() {
           rating: c.rating,
           reviews: c.reviews,
           placeId: c.placeId,
-          status: c.status || 'Not Started',
-          priority: c.priority || 'Low',
-          lastContactDate: c.lastContact !== '-' ? new Date(c.lastContact) : null,
-        }))
-      );
-      res.json(result);
+          imageUrl: c.imageUrl,
+          status: c.status || 'Not Contacted',
+          priority: c.priority || 'Medium',
+          lastContactDate: c.lastContact && c.lastContact !== '-' ? new Date(c.lastContact) : null,
+        }));
+
+      if (toInsert.length === 0) {
+        return res.json({ inserted: 0, message: 'All companies were duplicates — nothing inserted.' });
+      }
+
+      const result = await Company.insertMany(toInsert);
+      res.json({ inserted: result.length, data: result });
     } catch (error) {
       console.error(error);
       res.status(500).json({ error: 'Failed to create companies' });
@@ -243,6 +321,42 @@ async function startServer() {
     } catch (error) {
       console.error(error);
       res.status(500).json({ error: 'Failed to create note' });
+    }
+  });
+
+  // --- ASSETS ---
+  app.get('/api/assets', async (req, res) => {
+    try {
+      const assets = await Asset.find().sort({ createdAt: -1 });
+      res.json(assets);
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ error: 'Failed to fetch assets' });
+    }
+  });
+
+  app.post('/api/assets', upload.single('file'), async (req, res) => {
+    try {
+      console.log('req.body:', req.body, 'req.file:', req.file);
+      const assetData = { ...req.body };
+      if (req.file) {
+        assetData.url = `/uploads/${req.file.filename}`;
+      }
+      const asset = await Asset.create(assetData);
+      res.json(asset);
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ error: 'Failed to create asset' });
+    }
+  });
+
+  app.delete('/api/assets/:id', async (req, res) => {
+    try {
+      await Asset.findByIdAndDelete(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ error: 'Failed to delete asset' });
     }
   });
 

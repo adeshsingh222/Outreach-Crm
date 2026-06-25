@@ -13,7 +13,17 @@ export type Company = {
   rating?: number;
   reviews?: number;
   placeId?: string;
+  imageUrl?: string;
   enriched?: boolean;
+};
+
+export type Asset = {
+  id: string;
+  title: string;
+  url: string;
+  type: 'PDF' | 'Portfolio' | 'GitHub' | 'LinkedIn' | 'Other';
+  description?: string;
+  createdAt: string;
 };
 
 // Dummy data removed to ensure database connectivity is accurately reflected
@@ -39,6 +49,11 @@ interface AppState {
   fetchCompanies: (page?: number, limit?: number) => Promise<void>;
   addCompanies: (newCompanies: Company[]) => Promise<void>;
   updateCompany: (id: string, data: Partial<Company>) => Promise<void>;
+
+  assets: Asset[];
+  fetchAssets: () => Promise<void>;
+  addAsset: (asset: Omit<Asset, 'id' | 'createdAt' | 'url'> & { url?: string; file?: File }) => Promise<void>;
+  deleteAsset: (id: string) => Promise<void>;
 }
 
 export const useAppStore = create<AppState>((set, get) => ({
@@ -127,8 +142,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       }
       
       // Refetch from database to get the real MongoDB ObjectIds
-      const store = useAppStore.getState();
-      await store.fetchCompanies();
+      await get().fetchCompanies();
       
     } catch (err) {
       console.error("Failed to add companies due to network/database error.", err);
@@ -137,7 +151,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   updateCompany: async (id, data) => {
     try {
       // Optimistic update first for better UX
-      set((state) => ({
+      set(state => ({
         companies: state.companies.map(c => c.id === id ? { ...c, ...data } : c)
       }));
 
@@ -150,14 +164,69 @@ export const useAppStore = create<AppState>((set, get) => ({
       if (!res.ok) {
         console.error("Failed to persist update to database. Reverting...");
         // Revert by refetching
-        const store = useAppStore.getState();
-        await store.fetchCompanies();
+        await get().fetchCompanies();
       }
     } catch (err) {
       console.error("Database connection unavailable or update failed", err);
       // Revert by refetching
-      const store = useAppStore.getState();
-      await store.fetchCompanies();
+      await get().fetchCompanies();
     }
   },
+  
+  assets: [],
+  fetchAssets: async () => {
+    try {
+      const res = await fetch('/api/assets');
+      if (res.ok) {
+        const data = await res.json();
+        set({ assets: data.data || data });
+      } else {
+        set({ assets: [] });
+      }
+    } catch (err) {
+      console.error("Failed to fetch assets", err);
+      set({ assets: [] });
+    }
+  },
+  addAsset: async (asset) => {
+    try {
+      let body: any;
+      let headers: HeadersInit = {};
+
+      if (asset.file) {
+        const formData = new FormData();
+        formData.append('title', asset.title);
+        formData.append('type', asset.type);
+        if (asset.description) formData.append('description', asset.description);
+        formData.append('file', asset.file);
+        body = formData;
+      } else {
+        headers = { 'Content-Type': 'application/json' };
+        body = JSON.stringify(asset);
+      }
+
+      const res = await fetch('/api/assets', {
+        method: 'POST',
+        headers,
+        body
+      });
+      if (res.ok) {
+        await get().fetchAssets();
+      }
+    } catch (err) {
+      console.error("Failed to add asset", err);
+    }
+  },
+  deleteAsset: async (id) => {
+    try {
+      const res = await fetch(`/api/assets/${id}`, {
+        method: 'DELETE'
+      });
+      if (res.ok) {
+        await get().fetchAssets();
+      }
+    } catch (err) {
+      console.error("Failed to delete asset", err);
+    }
+  }
 }));

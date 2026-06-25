@@ -2,6 +2,7 @@ import mongoose, { Schema, Document } from 'mongoose';
 
 export interface ICompany extends Document {
   name: string;
+  metaName?: string;
   website?: string;
   phone?: string;
   address?: string;
@@ -20,6 +21,7 @@ export interface ICompany extends Document {
   lastContactDate?: Date;
   nextFollowUp?: Date;
   placeId?: string;
+  imageUrl?: string;
 
   status: string;
   priority: string;
@@ -31,6 +33,7 @@ export interface ICompany extends Document {
 
 const CompanySchema: Schema = new Schema({
   name: { type: String, required: true },
+  metaName: { type: String, index: true },
   website: { type: String },
   phone: { type: String },
   address: { type: String },
@@ -41,6 +44,7 @@ const CompanySchema: Schema = new Schema({
   lat: { type: Number },
   lng: { type: Number },
   placeId: { type: String },
+  imageUrl: { type: String },
 
   hrName: { type: String },
   linkedin: { type: String },

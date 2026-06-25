@@ -18,7 +18,8 @@ import {
   Clock,
   UploadCloud,
   Sparkles,
-  Star
+  Star,
+  MessageCircle,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useNavigate } from 'react-router-dom';
@@ -27,7 +28,7 @@ import { useEffect } from 'react';
 
 export default function Companies() {
   const navigate = useNavigate();
-  const { companies, totalCompanies, currentPage, limit, setPage, setLimit, fetchCompanies } = useAppStore();
+  const { companies, totalCompanies, currentPage, limit, setPage, setLimit, fetchCompanies, updateCompany } = useAppStore();
 
   useEffect(() => {
     fetchCompanies(currentPage, limit);
@@ -43,20 +44,21 @@ export default function Companies() {
         const domain = website ? website.replace(/^https?:\/\//, '').replace(/^www\./, '').split('/')[0] : null;
         
         return (
-          <div className="relative group/hovercard">
+          <div className="relative group/hovercard inline-block max-w-full">
             <button 
               onClick={() => navigate(`/companies/${info.row.original.id}`)}
-              className="font-medium text-foreground flex items-center gap-2 hover:text-primary transition-colors text-left"
+              className="font-medium text-foreground flex items-center gap-2 hover:text-primary transition-colors text-left max-w-[200px]"
+              title={info.getValue() as string}
             >
-              <Building2 className="w-4 h-4 text-foreground-faint" /> 
-              {info.getValue()}
-              {info.row.original.enriched && <Sparkles className="w-3.5 h-3.5 text-primary ml-1" />}
+              <Building2 className="w-4 h-4 text-foreground-faint shrink-0" /> 
+              <span className="truncate">{info.getValue()}</span>
+              {info.row.original.enriched && <Sparkles className="w-3.5 h-3.5 text-primary ml-1 shrink-0" />}
             </button>
             {domain && (
-              <div className="absolute left-0 bottom-full mb-2 hidden group-hover/hovercard:block z-50 animate-in fade-in zoom-in-95 duration-200">
-                <div className="bg-surface border border-border rounded-xl shadow-xl p-2 w-[400px] h-[400px] flex items-center justify-center overflow-hidden">
+              <div className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 hidden group-hover/hovercard:flex z-[9999] animate-in fade-in zoom-in-95 duration-200 shadow-2xl rounded-xl">
+                <div className="bg-surface border border-border rounded-xl p-2 w-[400px] h-[400px] flex items-center justify-center overflow-hidden">
                   <img 
-                    src={`https://logo.clearbit.com/${domain}?size=400`} 
+                    src={info.row.original.imageUrl || `https://logo.clearbit.com/${domain}?size=400`} 
                     alt={`${info.getValue()} logo`}
                     className="w-full h-full object-contain bg-white rounded-lg"
                     onError={(e) => {
@@ -82,17 +84,47 @@ export default function Companies() {
     columnHelper.accessor('status', {
       header: 'Status',
       cell: info => (
-        <span className="px-2 py-0.5 bg-secondary text-foreground-muted text-[11px] rounded-sm font-medium border border-border">
-          {info.getValue() || 'Not Started'}
-        </span>
+        <select 
+          value={info.getValue() || 'Not Started'}
+          onChange={(e) => {
+            e.stopPropagation();
+            updateCompany(info.row.original.id, { status: e.target.value });
+          }}
+          onClick={e => e.stopPropagation()}
+          className={cn(
+            "px-2 py-0.5 bg-secondary text-foreground-muted text-[11px] rounded-sm font-medium border border-border appearance-none cursor-pointer focus:outline-none focus:ring-1 focus:ring-primary/50 text-center text-center-last",
+            info.getValue() === 'Not Started' ? "bg-secondary text-foreground-muted" : "bg-success-bg text-success-text border-transparent"
+          )}
+        >
+          <option value="Not Started" className="bg-surface text-foreground">Not Started</option>
+          <option value="Contacted" className="bg-surface text-foreground">Contacted</option>
+          <option value="Pitched" className="bg-surface text-foreground">Pitched</option>
+          <option value="Follow-up" className="bg-surface text-foreground">Follow-up</option>
+          <option value="Connected" className="bg-surface text-foreground">Connected</option>
+          <option value="Lost" className="bg-surface text-foreground">Lost</option>
+        </select>
       ),
     }),
     columnHelper.accessor('priority', {
       header: 'Priority',
       cell: info => {
-        const p = info.getValue();
+        const p = info.getValue() || 'Low';
         const color = p === 'High' ? 'text-error-text bg-error-bg border-transparent' : p === 'Medium' ? 'text-warning-text bg-warning-bg border-transparent' : 'text-foreground-muted bg-secondary border-border';
-        return <span className={cn("px-2 py-0.5 rounded-sm text-[11px] font-medium border", color)}>{p || 'Low'}</span>;
+        return (
+          <select 
+            value={p}
+            onChange={(e) => {
+              e.stopPropagation();
+              updateCompany(info.row.original.id, { priority: e.target.value });
+            }}
+            onClick={e => e.stopPropagation()}
+            className={cn("px-2 py-0.5 rounded-sm text-[11px] font-medium border appearance-none cursor-pointer focus:outline-none focus:ring-1 focus:ring-primary/50 text-center text-center-last w-[70px]", color)}
+          >
+            <option value="Low" className="text-foreground bg-surface">Low</option>
+            <option value="Medium" className="text-foreground bg-surface">Medium</option>
+            <option value="High" className="text-foreground bg-surface">High</option>
+          </select>
+        );
       },
     }),
     columnHelper.accessor('lastContact', {
@@ -113,6 +145,10 @@ export default function Companies() {
         );
       },
     }),
+    columnHelper.accessor('reviews', {
+      header: 'Reviews',
+      cell: info => <span className="text-foreground-muted">{info.getValue() ? `${info.getValue()} rev.` : '-'}</span>,
+    }),
     columnHelper.display({
       id: 'actions',
       header: 'Quick Actions',
@@ -126,18 +162,30 @@ export default function Companies() {
               <Sparkles className="w-3.5 h-3.5" />
             </button>
           )}
-          <button className="p-1.5 text-foreground-faint hover:text-primary hover:bg-primary/10 rounded-md transition-colors" title="Log Call">
+          <button 
+            onClick={(e) => {
+              e.stopPropagation();
+              updateCompany(row.original.id, { status: 'Contacted' });
+              window.open(`tel:${row.original.phone?.replace(/\D/g, '') || ''}`, '_self');
+            }}
+            className="p-1.5 text-foreground-faint hover:text-primary hover:bg-primary/10 rounded-md transition-colors" title="Call Contact">
             <Phone className="w-3.5 h-3.5" />
           </button>
+          {/* 
           <button className="p-1.5 text-foreground-faint hover:text-primary hover:bg-primary/10 rounded-md transition-colors" title="Open LinkedIn">
             <Linkedin className="w-3.5 h-3.5" />
           </button>
-          <button className="p-1.5 text-foreground-faint hover:text-primary hover:bg-primary/10 rounded-md transition-colors" title="Send Email">
-            <Mail className="w-3.5 h-3.5" />
+          */}
+          <button 
+            onClick={() => window.open(`https://wa.me/${row.original.phone?.replace(/\D/g, '')}?text=Hi`, '_blank')}
+            className="p-1.5 text-foreground-faint hover:text-[#25D366] hover:bg-[#25D366]/10 rounded-md transition-colors" title="Send WhatsApp">
+            <MessageCircle className="w-3.5 h-3.5" />
           </button>
+          {/*
           <button className="p-1.5 text-foreground-faint hover:text-primary hover:bg-primary/10 rounded-md transition-colors" title="Set Reminder">
             <Clock className="w-3.5 h-3.5" />
           </button>
+          */}
         </div>
       )
     })
@@ -221,7 +269,7 @@ export default function Companies() {
                     <td 
                       key={cell.id} 
                       className={cn(
-                        "px-6 py-3.5 whitespace-nowrap text-[13px] text-foreground bg-surface group-hover:bg-secondary/50 transition-colors",
+                        "px-6 py-3.5 whitespace-nowrap text-[13px] text-foreground bg-surface group-hover:bg-secondary transition-colors",
                         cell.column.id === 'actions' && "sticky right-0 border-l border-border z-20"
                       )}
                     >
