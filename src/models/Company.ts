@@ -21,6 +21,7 @@ export interface ICompany extends Document {
   lastContactDate?: Date;
   nextFollowUp?: Date;
   placeId?: string;
+  googleMapsUrl?: string;
   imageUrl?: string;
 
   status: string;
@@ -44,6 +45,7 @@ const CompanySchema: Schema = new Schema({
   lat: { type: Number },
   lng: { type: Number },
   placeId: { type: String, index: true },
+  googleMapsUrl: { type: String },
   imageUrl: { type: String },
 
   hrName: { type: String },

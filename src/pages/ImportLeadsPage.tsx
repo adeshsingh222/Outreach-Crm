@@ -15,6 +15,7 @@ export type ImportedLead = {
   rating?: number;
   reviews?: number;
   placeId?: string;
+  googleMapsUrl?: string;
   imageUrl?: string;
   isDeleted: boolean;
   isDuplicate: boolean; // true = already exists in DB
@@ -45,6 +46,7 @@ export default function ImportLeadsPage() {
             rating: Number(row.rating || row.Rating) || undefined,
             reviews: Number(row.reviews || row.Reviews) || undefined,
             placeId: row.placeId || row.place_id || row.google_id || '',
+            googleMapsUrl: row.location_link || row.googleMapsUrl || row.google_maps_url || '',
             imageUrl: row.photo || row.photo1 || row.image || row.image_url || row.imageUrl || '',
             isDeleted: false,
             isDuplicate: false,
@@ -130,6 +132,7 @@ export default function ImportLeadsPage() {
       rating: lead.rating,
       reviews: lead.reviews,
       placeId: lead.placeId,
+      googleMapsUrl: lead.googleMapsUrl,
       imageUrl: lead.imageUrl,
       status: 'Not Started',
       priority: 'Low',

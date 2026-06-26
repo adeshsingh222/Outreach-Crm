@@ -14,7 +14,7 @@ import {
   Phone,
   Linkedin,
   Mail,
-  FileText,
+  MapPin,
   Clock,
   UploadCloud,
   Sparkles,
@@ -79,6 +79,15 @@ export default function Companies() {
         if (!val) return <span className="text-foreground-faint">-</span>;
         const url = val.startsWith('http') ? val : `https://${val}`;
         return <a href={url} target="_blank" rel="noreferrer" className="text-foreground-muted hover:text-primary transition-colors flex items-center gap-1 truncate max-w-[150px]" onClick={e => e.stopPropagation()}>{val} <ExternalLink className="w-3 h-3" /></a>
+      },
+    }),
+    columnHelper.accessor('category', {
+      header: 'Category',
+      cell: info => {
+        const val = info.getValue();
+        return val
+          ? <span className="text-foreground-muted truncate max-w-[160px] inline-block" title={val}>{val}</span>
+          : <span className="text-foreground-faint">-</span>;
       },
     }),
     columnHelper.accessor('status', {
@@ -154,8 +163,24 @@ export default function Companies() {
       header: 'Quick Actions',
       cell: ({ row }) => (
         <div className="flex items-center gap-1.5" onClick={e => e.stopPropagation()}>
-          <button onClick={() => navigate(`/companies/${row.original.id}`)} className="p-1.5 text-foreground-faint hover:text-primary hover:bg-primary/10 rounded-md transition-colors" title="View Details">
-            <FileText className="w-3.5 h-3.5" />
+          <button 
+            onClick={(e) => {
+              e.stopPropagation();
+              const company = row.original;
+              let url = '';
+              if (company.googleMapsUrl) {
+                url = company.googleMapsUrl;
+              } else if (company.placeId) {
+                url = `https://www.google.com/maps/place/?q=place_id:${company.placeId}`;
+              } else {
+                url = `https://www.google.com/search?q=${encodeURIComponent(company.name)}`;
+              }
+              window.open(url, '_blank');
+            }}
+            className="p-1.5 text-foreground-faint hover:text-[#4285F4] hover:bg-[#4285F4]/10 rounded-md transition-colors" 
+            title="View on Google Maps"
+          >
+            <MapPin className="w-3.5 h-3.5" />
           </button>
           {!row.original.enriched && (
             <button onClick={() => navigate(`/companies/${row.original.id}`)} className="p-1.5 text-foreground-faint hover:text-primary hover:bg-primary/10 rounded-md transition-colors" title="Enrich Data">
@@ -165,7 +190,11 @@ export default function Companies() {
           <button 
             onClick={(e) => {
               e.stopPropagation();
-              updateCompany(row.original.id, { status: 'Contacted' });
+              updateCompany(row.original.id, { 
+                status: 'Contacted', 
+                lastContactDate: new Date().toISOString(),
+                lastContact: new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+              } as any);
               window.open(`tel:${row.original.phone?.replace(/\D/g, '') || ''}`, '_self');
             }}
             className="p-1.5 text-foreground-faint hover:text-primary hover:bg-primary/10 rounded-md transition-colors" title="Call Contact">

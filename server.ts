@@ -315,6 +315,7 @@ async function startServer() {
           rating: c.rating,
           reviews: c.reviews,
           placeId: c.placeId,
+          googleMapsUrl: c.googleMapsUrl,
           imageUrl: c.imageUrl,
           status: c.status || 'Not Contacted',
           priority: c.priority || 'Medium',

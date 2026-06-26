@@ -13,6 +13,7 @@ export type Company = {
   rating?: number;
   reviews?: number;
   placeId?: string;
+  googleMapsUrl?: string;
   imageUrl?: string;
   enriched?: boolean;
 };
@@ -119,8 +120,14 @@ export const useAppStore = create<AppState>((set, get) => ({
         return;
       }
       const data = await res.json();
+      const mapped = (data.data || []).map((c: any) => ({
+        ...c,
+        lastContact: c.lastContactDate
+          ? new Date(c.lastContactDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+          : '-',
+      }));
       set({ 
-        companies: data.data, 
+        companies: mapped, 
         totalCompanies: data.total,
         currentPage: data.page 
       });
