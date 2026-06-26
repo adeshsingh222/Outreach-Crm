@@ -195,7 +195,7 @@ export default function Companies() {
                 lastContactDate: new Date().toISOString(),
                 lastContact: new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
               } as any);
-              window.open(`tel:${row.original.phone?.replace(/\D/g, '') || ''}`, '_self');
+              window.open(`tel:${row.original.phone?.replace(/[^\d+]/g, '') || ''}`, '_self');
             }}
             className="p-1.5 text-foreground-faint hover:text-primary hover:bg-primary/10 rounded-md transition-colors" title="Call Contact">
             <Phone className="w-3.5 h-3.5" />
@@ -206,7 +206,7 @@ export default function Companies() {
           </button>
           */}
           <button 
-            onClick={() => window.open(`https://wa.me/${row.original.phone?.replace(/\D/g, '')}?text=Hi`, '_blank')}
+            onClick={() => window.open(`https://wa.me/${row.original.phone?.replace(/[^\d+]/g, '')}?text=Hi`, '_blank')}
             className="p-1.5 text-foreground-faint hover:text-[#25D366] hover:bg-[#25D366]/10 rounded-md transition-colors" title="Send WhatsApp">
             <MessageCircle className="w-3.5 h-3.5" />
           </button>
