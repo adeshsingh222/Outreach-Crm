@@ -26,6 +26,12 @@ import { useNavigate } from 'react-router-dom';
 import { useAppStore, Company } from '@/lib/store';
 import { useEffect } from 'react';
 
+const WHATSAPP_MESSAGE = `Hi! I hope you're doing well.
+
+I'm a MERN Stack / React.js developer with 2.5+ years of experience building full-stack web applications using React, Next.js, Node.js, Express, and MongoDB. I wanted to check if your company has any current or upcoming openings for a Full Stack or React Developer.
+
+I'd be happy to share my resume and portfolio. Thank you!`;
+
 export default function Companies() {
   const navigate = useNavigate();
   const { companies, totalCompanies, currentPage, limit, setPage, setLimit, fetchCompanies, updateCompany, searchQuery } = useAppStore();
@@ -208,7 +214,7 @@ export default function Companies() {
           </button>
           */}
           <button 
-            onClick={() => window.open(`https://wa.me/${row.original.phone?.replace(/[^\d+]/g, '')}?text=Hi`, '_blank')}
+            onClick={() => window.open(`https://wa.me/${row.original.phone?.replace(/[^\d+]/g, '')}?text=${encodeURIComponent(WHATSAPP_MESSAGE)}`, '_blank')}
             className="p-1.5 text-foreground-faint hover:text-[#25D366] hover:bg-[#25D366]/10 rounded-md transition-colors" title="Send WhatsApp">
             <MessageCircle className="w-3.5 h-3.5" />
           </button>
