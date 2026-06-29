@@ -134,9 +134,11 @@ async function startServer() {
       const total = await Company.countDocuments();
       const notStarted = await Company.countDocuments({ status: { $in: ['Not Started', 'Not Contacted'] } });
       const contacted = await Company.countDocuments({ status: 'Contacted' });
+      const notConnected = await Company.countDocuments({ status: 'Not Connected' });
       const pitched = await Company.countDocuments({ status: 'Pitched' });
       const followUp = await Company.countDocuments({ status: 'Follow-up' });
       const connected = await Company.countDocuments({ status: 'Connected' });
+      const resumeSent = await Company.countDocuments({ status: 'Resume Sent' });
       const lost = await Company.countDocuments({ status: 'Lost' });
 
       const now = new Date();
@@ -175,9 +177,11 @@ async function startServer() {
         total,
         notStarted,
         contacted,
+        notConnected,
         pitched,
         followUp,
         connected,
+        resumeSent,
         lost,
         overdue,
         activityChart: chartData
@@ -228,7 +232,7 @@ async function startServer() {
       const skip = (page - 1) * limit;
 
       const [companies, total] = await Promise.all([
-        Company.find().sort({ createdAt: -1 }).skip(skip).limit(limit),
+        Company.find().sort({ createdAt: -1, _id: -1 }).skip(skip).limit(limit),
         Company.countDocuments()
       ]);
 

@@ -107,9 +107,11 @@ export default function Companies() {
         >
           <option value="Not Started" className="bg-surface text-foreground">Not Started</option>
           <option value="Contacted" className="bg-surface text-foreground">Contacted</option>
+          <option value="Not Connected" className="bg-surface text-foreground">Not Connected</option>
           <option value="Pitched" className="bg-surface text-foreground">Pitched</option>
           <option value="Follow-up" className="bg-surface text-foreground">Follow-up</option>
           <option value="Connected" className="bg-surface text-foreground">Connected</option>
+          <option value="Resume Sent" className="bg-surface text-foreground">Resume Sent</option>
           <option value="Lost" className="bg-surface text-foreground">Lost</option>
         </select>
       ),

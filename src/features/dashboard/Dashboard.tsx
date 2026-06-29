@@ -60,9 +60,11 @@ export default function Dashboard() {
     { label: 'Total Leads', value: stats?.total ?? 0 },
     { label: 'Not Started', value: stats?.notStarted ?? 0 },
     { label: 'Contacted', value: stats?.contacted ?? 0 },
+    { label: 'Not Connected', value: stats?.notConnected ?? 0 },
     { label: 'Pitched', value: stats?.pitched ?? 0 },
     { label: 'Follow-up', value: stats?.followUp ?? 0 },
     { label: 'Connected', value: stats?.connected ?? 0 },
+    { label: 'Resume Sent', value: stats?.resumeSent ?? 0 },
     { label: 'Lost', value: stats?.lost ?? 0 },
   ];
 
@@ -247,28 +249,30 @@ export default function Dashboard() {
         </div>
 
         {/* Right Column (Timeline) */}
-        <div className="lg:col-span-4 h-full">
+        <div className="lg:col-span-4 h-full lg:max-h-[calc(100vh-200px)] lg:min-h-[600px]">
           <div className="bg-surface border border-border rounded-lg p-6 shadow-card h-full flex flex-col">
-            <h3 className="text-[15px] font-semibold text-foreground mb-8">Recent Activity</h3>
-            <div className="flex-1 relative border-l border-border ml-2.5 space-y-8 pb-4">
-              {activities.length > 0 ? (
-                activities.map((timeline, i) => (
-                  <div key={i} className="relative pl-6">
-                    <div className="absolute w-2 h-2 bg-primary rounded-full -left-[4.5px] top-1.5 ring-4 ring-surface"></div>
-                    <p className="text-[13px] font-medium text-foreground">{timeline.type}</p>
-                    <p className="text-[13px] text-foreground-muted leading-snug mt-1">
-                      {timeline.description} {timeline.company ? `(${timeline.company.name})` : ''}
-                    </p>
-                    <span className="text-[11px] text-foreground-faint font-medium mt-1.5 block uppercase tracking-wider">
-                      {timeAgo(timeline.createdAt)}
-                    </span>
+            <h3 className="text-[15px] font-semibold text-foreground mb-8 shrink-0">Recent Activity</h3>
+            <div className="flex-1 relative overflow-y-auto min-h-0 pr-2">
+              <div className="border-l border-border ml-2.5 space-y-8 pb-4">
+                {activities.length > 0 ? (
+                  activities.map((timeline, i) => (
+                    <div key={i} className="relative pl-6">
+                      <div className="absolute w-2 h-2 bg-primary rounded-full -left-[4.5px] top-1.5 ring-4 ring-surface"></div>
+                      <p className="text-[13px] font-medium text-foreground">{timeline.type}</p>
+                      <p className="text-[13px] text-foreground-muted leading-snug mt-1">
+                        {timeline.description} {timeline.company ? `(${timeline.company.name})` : ''}
+                      </p>
+                      <span className="text-[11px] text-foreground-faint font-medium mt-1.5 block uppercase tracking-wider">
+                        {timeAgo(timeline.createdAt)}
+                      </span>
+                    </div>
+                  ))
+                ) : (
+                  <div className="text-sm text-foreground-faint pl-6">
+                    No recent activity logged.
                   </div>
-                ))
-              ) : (
-                <div className="text-sm text-foreground-faint pl-6">
-                  No recent activity logged.
-                </div>
-              )}
+                )}
+              </div>
             </div>
           </div>
         </div>
