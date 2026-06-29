@@ -28,11 +28,11 @@ import { useEffect } from 'react';
 
 export default function Companies() {
   const navigate = useNavigate();
-  const { companies, totalCompanies, currentPage, limit, setPage, setLimit, fetchCompanies, updateCompany } = useAppStore();
+  const { companies, totalCompanies, currentPage, limit, setPage, setLimit, fetchCompanies, updateCompany, searchQuery } = useAppStore();
 
   useEffect(() => {
-    fetchCompanies(currentPage, limit);
-  }, [currentPage, limit, fetchCompanies]);
+    fetchCompanies(currentPage, limit, searchQuery);
+  }, [currentPage, limit, searchQuery, fetchCompanies]);
 
   const columnHelper = createColumnHelper<Company>();
 
@@ -250,14 +250,7 @@ export default function Companies() {
             <option value={50}>50 per page</option>
             <option value={100}>100 per page</option>
           </select>
-          <div className="relative flex-1 sm:flex-initial">
-            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-foreground-faint" />
-            <input 
-              type="text" 
-              placeholder="Filter leads..." 
-              className="w-full sm:w-64 pl-9 pr-4 py-1.5 bg-surface border border-border rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary transition-all shadow-sm text-foreground placeholder:text-foreground-faint"
-            />
-          </div>
+
           <button 
             onClick={() => navigate('/import')}
             className="flex items-center gap-1.5 px-3 py-1.5 bg-secondary text-foreground text-sm font-medium rounded-md hover:bg-secondary/80 border border-border transition-colors shadow-sm whitespace-nowrap"
@@ -278,8 +271,8 @@ export default function Companies() {
                     <th 
                       key={header.id} 
                       className={cn(
-                        "px-6 py-3 whitespace-nowrap text-[13px]",
-                        header.id === 'actions' && "sticky right-0 bg-secondary border-l border-border z-20"
+                        "py-3 whitespace-nowrap text-[13px]",
+                        header.id === 'actions' ? "px-3 md:px-6 sticky right-0 bg-secondary border-l border-border z-20" : "px-6"
                       )}
                     >
                       {header.isPlaceholder
@@ -300,8 +293,8 @@ export default function Companies() {
                     <td 
                       key={cell.id} 
                       className={cn(
-                        "px-6 py-3.5 whitespace-nowrap text-[13px] text-foreground bg-surface group-hover:bg-secondary transition-colors",
-                        cell.column.id === 'actions' && "sticky right-0 border-l border-border z-20"
+                        "py-3.5 whitespace-nowrap text-[13px] text-foreground bg-surface group-hover:bg-secondary transition-colors",
+                        cell.column.id === 'actions' ? "px-3 md:px-6 sticky right-0 border-l border-border z-20" : "px-6"
                       )}
                     >
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}

@@ -47,7 +47,9 @@ interface AppState {
   limit: number;
   setPage: (page: number) => void;
   setLimit: (limit: number) => void;
-  fetchCompanies: (page?: number, limit?: number) => Promise<void>;
+  searchQuery: string;
+  setSearchQuery: (query: string) => void;
+  fetchCompanies: (page?: number, limit?: number, search?: string) => Promise<void>;
   addCompanies: (newCompanies: Company[]) => Promise<void>;
   updateCompany: (id: string, data: Partial<Company>) => Promise<void>;
 
@@ -109,11 +111,13 @@ export const useAppStore = create<AppState>((set, get) => ({
   totalCompanies: 0,
   currentPage: 1,
   limit: 20,
+  searchQuery: '',
   setPage: (page) => set({ currentPage: page }),
   setLimit: (limit) => set({ limit, currentPage: 1 }), // Reset to page 1 on limit change
-  fetchCompanies: async (page = get().currentPage, limit = get().limit) => {
+  setSearchQuery: (query) => set({ searchQuery: query, currentPage: 1 }),
+  fetchCompanies: async (page = get().currentPage, limit = get().limit, search = get().searchQuery) => {
     try {
-      const res = await fetch(`/api/companies?page=${page}&limit=${limit}`);
+      const res = await fetch(`/api/companies?page=${page}&limit=${limit}&search=${encodeURIComponent(search)}`);
       if (!res.ok) {
         console.error("Failed to fetch companies");
         set({ companies: [], totalCompanies: 0 });

@@ -1,4 +1,4 @@
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { 
   LayoutDashboard, 
@@ -29,10 +29,29 @@ const NAV_ITEMS = [
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const location = useLocation();
-  const { theme, setTheme, user, logout } = useAppStore();
+  const navigate = useNavigate();
+  const { theme, setTheme, user, logout, searchQuery, setSearchQuery } = useAppStore();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const profileRef = useRef<HTMLDivElement>(null);
+  
+  const [localSearch, setLocalSearch] = useState(searchQuery || '');
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (localSearch !== searchQuery) {
+        setSearchQuery(localSearch);
+        if (localSearch && !location.pathname.startsWith('/companies')) {
+          navigate('/companies');
+        }
+      }
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [localSearch, searchQuery, setSearchQuery, navigate, location.pathname]);
+
+  useEffect(() => {
+    setLocalSearch(searchQuery || '');
+  }, [searchQuery]);
 
   useEffect(() => {
     if (theme === 'dark') {
@@ -125,16 +144,18 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <header className="h-16 px-4 md:px-8 border-b flex items-center justify-between shrink-0 bg-surface/50 backdrop-blur-sm border-border relative z-30">
           <div className="flex items-center gap-4 flex-1">
             <button 
-              className="md:hidden p-2 -ml-2 text-foreground-muted hover:bg-secondary hover:text-foreground rounded-md"
+              className="md:hidden p-2 -ml-2 text-foreground-muted hover:bg-secondary hover:text-foreground rounded-md shrink-0"
               onClick={() => setIsMobileMenuOpen(true)}
             >
               <Menu className="w-5 h-5" />
             </button>
-            <div className="flex-1 max-w-lg relative hidden sm:block">
+            <div className="flex-1 max-w-lg relative">
               <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-foreground-faint" />
               <input 
                 type="text" 
                 placeholder="Search companies, contacts..." 
+                value={localSearch}
+                onChange={(e) => setLocalSearch(e.target.value)}
                 className="w-full pl-9 pr-4 py-1.5 bg-surface border border-border rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary transition-all text-foreground shadow-sm placeholder:text-foreground-faint"
               />
             </div>

@@ -229,11 +229,22 @@ async function startServer() {
     try {
       const page = parseInt(req.query.page as string) || 1;
       const limit = parseInt(req.query.limit as string) || 20;
+      const search = req.query.search as string || '';
       const skip = (page - 1) * limit;
+      
+      const query: any = {};
+      if (search) {
+        query.$or = [
+          { name: { $regex: search, $options: 'i' } },
+          { website: { $regex: search, $options: 'i' } },
+          { email: { $regex: search, $options: 'i' } },
+          { category: { $regex: search, $options: 'i' } }
+        ];
+      }
 
       const [companies, total] = await Promise.all([
-        Company.find().sort({ createdAt: -1, _id: -1 }).skip(skip).limit(limit),
-        Company.countDocuments()
+        Company.find(query).sort({ createdAt: -1, _id: -1 }).skip(skip).limit(limit),
+        Company.countDocuments(query)
       ]);
 
       res.json({
